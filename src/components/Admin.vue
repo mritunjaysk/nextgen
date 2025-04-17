@@ -1,5 +1,6 @@
 <template>
   <div class="layout">
+    <Menu />
     <main class="content">
       <div class="container mt-4">
         <h1 class="mb-4 text-start"> User Management</h1>
@@ -69,11 +70,15 @@
 </template>
 
 <script>
+import Menu from './Menu.vue';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../main';
 
 export default {
   name: 'Admin',
+  components: {
+    Menu,
+  },
   setup() {
     const users = ref([]);
     const isModalOpen = ref(false);

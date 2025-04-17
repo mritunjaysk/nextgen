@@ -3,15 +3,15 @@
 
 <template>
   <div class="app-container">
-    <div class="left-menu">
-      <router-link to="/" active-class="active">Home</router-link>
-      <router-link to="/admin" active-class="active">Admin</router-link>
-    </div>
-    <div class="content">
-      <router-view></router-view>
-    </div>
+    <router-view></router-view>
   </div>
 </template>
+
+<script>
+export default {
+  name: "App",
+};
+</script>
 
 <style scoped>
 .app-container {
