@@ -18,6 +18,10 @@
               <th scope="col">Title</th>
               <th scope="col">Category</th>
               <th scope="col">Cooking Time</th>
+              <th scope="col">Description</th>
+              <th scope="col">Ingredients</th>
+              <th scope="col">Steps</th>
+              <th scope="col">Media</th>
               <th scope="col">Actions</th>
             </tr>
           </thead>
@@ -27,6 +31,13 @@
               <td>{{ recipe.title }}</td>
               <td>{{ recipe.category }}</td>
               <td>{{ recipe.cooking_time }}</td>
+              <td>{{ recipe.description }}</td>
+              <td>{{ recipe.ingredients }}</td>
+              <td>{{ recipe.steps }}</td>
+              <td>
+                <a v-if="recipe.media" :href="getSupabaseUrl(recipe.media)" target="_blank">View File</a>
+                <span v-else>No Media</span>
+              </td>
               <td>
                 <button class="btn btn-sm btn-warning me-2 text-start" @click="openModal('edit', recipe)">Edit</button>
                 <button class="btn btn-sm btn-danger text-start" @click="deleteRecipe(recipe.id)">Delete</button>
@@ -63,7 +74,7 @@
                   </div>
                   <div class="mb-3">
                     <label for="media" class="form-label">Media</label>
-                    <input v-model="modalRecipe.media" type="text" class="form-control" id="media" placeholder="Enter media URL" />
+                    <input type="file" class="form-control" id="media" @change="handleFileUpload" />
                   </div>
                   <div class="mb-3">
                     <label for="category" class="form-label">Category</label>
@@ -112,6 +123,8 @@ export default {
       cooking_time: '', // Updated key
     });
 
+    const uploadedFile = ref(null);
+
     const fetchRecipes = async () => {
       const { data, error } = await supabase.from('recipes').select('*');
       if (error) console.error(error);
@@ -136,8 +149,27 @@ export default {
       isModalOpen.value = false;
     };
 
+    const handleFileUpload = (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        uploadedFile.value = file;
+      }
+    };
+
     const createRecipe = async () => {
-      const { error } = await supabase.from('recipes').insert([modalRecipe.value]);
+      let mediaUrl = '';
+      if (uploadedFile.value) {
+        const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
+        const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
+        if (error) {
+          console.error('File upload error:', error);
+          return;
+        }
+        mediaUrl = data.path;
+      }
+
+      const recipeData = { ...modalRecipe.value, media: mediaUrl };
+      const { error } = await supabase.from('recipes').insert([recipeData]);
       if (error) console.error(error);
       else {
         fetchRecipes();
@@ -146,7 +178,17 @@ export default {
     };
 
     const updateRecipe = async () => {
-      const { id, ...updatedData } = modalRecipe.value;
+      let mediaUrl = modalRecipe.value.media;
+      if (uploadedFile.value) {
+        const { data, error } = await supabase.storage.from('uploads').upload(`recipes/${uploadedFile.value.name}`, uploadedFile.value);
+        if (error) {
+          console.error('File upload error:', error);
+          return;
+        }
+        mediaUrl = data.path;
+      }
+
+      const { id, ...updatedData } = { ...modalRecipe.value, media: mediaUrl };
       const { error } = await supabase.from('recipes').update(updatedData).eq('id', id);
       if (error) console.error(error);
       else {
@@ -161,6 +203,13 @@ export default {
       else fetchRecipes();
     };
 
+    const getSupabaseUrl = (path) => {
+      if (!path) return '';
+      const { data } = supabase.storage.from('uploads').getPublicUrl(path);
+      console.log('Generated Supabase URL:', data.publicUrl);
+      return data.publicUrl;
+    };
+
     onMounted(fetchRecipes);
 
     return {
@@ -170,9 +219,11 @@ export default {
       modalRecipe,
       openModal,
       closeModal,
+      handleFileUpload,
       createRecipe,
       updateRecipe,
       deleteRecipe,
+      getSupabaseUrl,
     };
   },
 };
