@@ -10,8 +10,8 @@
         
         <div v-else class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
           <div v-for="recipe in recipes" :key="recipe.id" class="col">
-            <div class="card h-100 shadow-sm recipe-card" @click="openRecipeDetails(recipe)">
-              <div class="card-img-container">
+            <div class="card h-100 shadow-sm recipe-card">
+              <div class="card-img-container" @click="openRecipeDetails(recipe)">
                 <template v-if="recipe.media">
                   <LoadingSpinner v-if="!imageLoadedMap[recipe.id]" class="py-2" />
                   <img 
@@ -29,12 +29,25 @@
               </div>
               <div class="card-body">
                 <div class="d-flex justify-content-between">
-                  <h5 class="card-title">{{ recipe.title }}</h5>
+                  <h5 class="card-title" @click="openRecipeDetails(recipe)">{{ recipe.title }}</h5>
                   <span class="badge rounded-pill" :class="getCategoryClass(recipe.category)">{{ recipe.category }}</span>
                 </div>
-                <p class="card-text text-truncate">{{ recipe.description }}</p>
+                <p class="card-text text-truncate" @click="openRecipeDetails(recipe)">{{ recipe.description }}</p>
                 <div class="d-flex justify-content-between align-items-center">
                   <small class="text-body-secondary">Cooking time: {{ recipe.cooking_time }}</small>
+                  <div class="d-flex align-items-center">
+                    <button 
+                      class="btn btn-link p-0 me-1 like-button" 
+                      @click.stop="toggleLike(recipe)"
+                      :disabled="likeInProgress"
+                    >
+                      <i 
+                        class="bi" 
+                        :class="isLikedByUser(recipe.id) ? 'bi-heart-fill text-danger' : 'bi-heart'"
+                      ></i>
+                    </button>
+                    <span class="likes-count">{{ recipe.likes_count || 0 }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -65,7 +78,18 @@
               
               <div class="mb-3 d-flex justify-content-between align-items-center">
                 <span class="badge rounded-pill" :class="getCategoryClass(selectedRecipe.category)">{{ selectedRecipe.category }}</span>
-                <span class="text-secondary">Cooking time: {{ selectedRecipe.cooking_time }}</span>
+                <div class="d-flex align-items-center">
+                  <span class="text-secondary me-3">Cooking time: {{ selectedRecipe.cooking_time }}</span>
+                  <button 
+                    class="btn btn-sm" 
+                    :class="isLikedByUser(selectedRecipe.id) ? 'btn-danger' : 'btn-outline-danger'"
+                    @click="toggleLike(selectedRecipe)"
+                    :disabled="likeInProgress"
+                  >
+                    <i class="bi" :class="isLikedByUser(selectedRecipe.id) ? 'bi-heart-fill' : 'bi-heart'"></i>
+                    <span class="ms-1">{{ selectedRecipe.likes_count || 0 }}</span>
+                  </button>
+                </div>
               </div>
               
               <div class="mb-4">
@@ -100,9 +124,10 @@
 
 <script>
 import Menu from './Menu.vue';
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, computed } from 'vue';
 import { supabase } from '../main';
 import LoadingSpinner from './LoadingSpinner.vue';
+import { useRouter } from 'vue-router';
 
 export default {
   name: 'Home',
@@ -118,6 +143,35 @@ export default {
     const modalImageLoading = ref(false);
     const modalImageLoaded = ref(false);
     const imageLoadedMap = reactive({});
+    const likeInProgress = ref(false);
+    const userLikes = ref([]);
+    const currentUser = ref(null);
+    const router = useRouter();
+
+    const fetchCurrentUser = () => {
+      // Get user from sessionStorage (matches the Login.vue approach)
+      const userData = sessionStorage.getItem('user');
+      if (userData) {
+        currentUser.value = JSON.parse(userData);
+        fetchUserLikes();
+      }
+    };
+
+    const fetchUserLikes = async () => {
+      if (!currentUser.value) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('likes')
+          .select('recipe_id')
+          .eq('user_id', currentUser.value.id);
+          
+        if (error) throw error;
+        userLikes.value = data ? data.map(like => like.recipe_id) : [];
+      } catch (error) {
+        console.error('Error fetching user likes:', error);
+      }
+    };
 
     const fetchRecipes = async () => {
       loading.value = true;
@@ -192,7 +246,80 @@ export default {
       return steps.split('\\n').filter(item => item.trim());
     };
 
-    onMounted(fetchRecipes);
+    const isLikedByUser = (recipeId) => {
+      return userLikes.value.includes(recipeId);
+    };
+
+    const toggleLike = async (recipe) => {
+      if (!currentUser.value) {
+        // Redirect to login page instead of alert
+        router.push('/login');
+        return;
+      }
+      
+      if (likeInProgress.value) return;
+      likeInProgress.value = true;
+
+      const isLiked = isLikedByUser(recipe.id);
+      
+      try {
+        if (isLiked) {
+          // Unlike the recipe
+          const { error } = await supabase
+            .from('likes')
+            .delete()
+            .eq('user_id', currentUser.value.id)
+            .eq('recipe_id', recipe.id);
+
+          if (error) throw error;
+          
+          // Update local state
+          userLikes.value = userLikes.value.filter(id => id !== recipe.id);
+          recipe.likes_count = Math.max(0, (recipe.likes_count || 1) - 1);
+          
+          // Update recipe like count in database
+          await supabase
+            .from('recipes')
+            .update({ likes_count: recipe.likes_count })
+            .eq('id', recipe.id);
+            
+        } else {
+          // Like the recipe
+          const { error } = await supabase
+            .from('likes')
+            .insert({
+              user_id: currentUser.value.id,
+              recipe_id: recipe.id
+            });
+
+          if (error) throw error;
+          
+          // Update local state
+          userLikes.value.push(recipe.id);
+          recipe.likes_count = (recipe.likes_count || 0) + 1;
+          
+          // Update recipe like count in database
+          await supabase
+            .from('recipes')
+            .update({ likes_count: recipe.likes_count })
+            .eq('id', recipe.id);
+        }
+        
+        // If this is the selected recipe in the modal, update it too
+        if (selectedRecipe.value && selectedRecipe.value.id === recipe.id) {
+          selectedRecipe.value = { ...recipe };
+        }
+      } catch (error) {
+        console.error('Error toggling like:', error);
+      } finally {
+        likeInProgress.value = false;
+      }
+    };
+
+    onMounted(() => {
+      fetchCurrentUser();
+      fetchRecipes();
+    });
 
     return {
       recipes,
@@ -209,7 +336,10 @@ export default {
       imageLoadedMap,
       setImageLoaded,
       setImageError,
-      modalImageLoaded
+      modalImageLoaded,
+      isLikedByUser,
+      toggleLike,
+      likeInProgress
     };
   },
 };
@@ -313,5 +443,30 @@ export default {
 }
 .recipe-details{
   text-align: left !important;
+}
+
+.like-button {
+  transition: transform 0.2s;
+  color: #dc3545;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.like-button:hover {
+  transform: scale(1.2);
+}
+
+.likes-count {
+  font-size: 0.875rem;
+  color: #6c757d;
+  margin-left: 4px;
+}
+
+.heart-container {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
 }
 </style>
