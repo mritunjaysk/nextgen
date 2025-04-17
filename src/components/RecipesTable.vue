@@ -88,11 +88,14 @@
 import Menu from './Menu.vue';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../main';
+import { HotTable } from '@handsontable/vue3';
+import 'handsontable/dist/handsontable.full.min.css';
 
 export default {
   name: 'RecipesTable',
   components: {
-    Menu
+    Menu,
+    HotTable
   },
   setup() {
     const recipes = ref([]);

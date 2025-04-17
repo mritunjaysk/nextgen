@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@handsontable/vue": "^15.2.0",
+    "@handsontable/vue3": "^15.2.0",
     "@supabase/supabase-js": "^2.49.4",
     "bootstrap": "^5.3.5",
     "handsontable": "^15.2.0",
