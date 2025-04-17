@@ -1,8 +1,8 @@
 <template>
   <div v-if="!isLoginPage" class="left-menu">
     <router-link to="/home" active-class="active">Home</router-link>
-    <router-link v-if="isAdmin" to="/admin" active-class="active">Admin</router-link>
     <router-link v-if="isAdmin" to="/recipes" active-class="active">Recipes</router-link>
+    <router-link v-if="isAdmin" to="/admin" active-class="active">Users</router-link>
     <router-link v-if="isLoggedIn" to="/" @click.native="handleLogout">Logout</router-link>
   </div>
 </template>

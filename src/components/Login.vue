@@ -15,6 +15,41 @@
       </form>
       <p v-if="errorMessage" class="text-danger mt-3">{{ errorMessage }}</p>
       <p v-if="successMessage" class="text-success mt-3">{{ successMessage }}</p>
+      
+      <!-- Credentials Table -->
+      <div class="mt-4">
+        <h5 class="text-center mb-3">Demo Credentials</h5>
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Email</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Admin</td>
+              <td>admin@example.com</td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary" @click="copyCredentials('admin@example.com')">
+                  Copy to Login
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td>User</td>
+              <td>user@example.com</td>
+              <td>
+                <button class="btn btn-sm btn-outline-secondary" @click="copyCredentials('user@example.com')">
+                  Copy to Login
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="text-muted small text-center">Password for all accounts: "password"</p>
+      </div>
     </div>
   </div>
 </template>
@@ -60,12 +95,25 @@ export default {
       }
     };
 
+    const copyCredentials = (emailValue) => {
+      email.value = emailValue;
+      password.value = 'password';
+      successMessage.value = 'Credentials copied! Logging in automatically...';
+      errorMessage.value = '';
+      
+      // Automatically trigger login after a short delay
+      setTimeout(() => {
+        handleLogin();
+      }, 200);
+    };
+
     return {
       email,
       password,
       errorMessage,
       successMessage,
       handleLogin,
+      copyCredentials,
     };
   },
 };
@@ -78,5 +126,10 @@ export default {
 .left-menu { 
     display: none !important;
     visibility: hidden !important;
+}
+
+/* Added styles for credentials table */
+.table {
+  font-size: 0.9rem;
 }
 </style>
