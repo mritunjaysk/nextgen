@@ -35,7 +35,7 @@
               <td>{{ recipe.ingredients }}</td>
               <td>{{ recipe.steps }}</td>
               <td>
-                <a v-if="recipe.media" :href="getSupabaseUrl(recipe.media)" target="_blank">View File</a>
+                <a v-if="recipe.media" href="#" @click.prevent="openImageModal(recipe.media)">View File</a>
                 <span v-else>No Media</span>
               </td>
               <td>
@@ -46,7 +46,7 @@
           </tbody>
         </table>
 
-        <!-- Modal -->
+        <!-- Recipe Modal -->
         <div class="modal fade show" tabindex="-1" style="display: block;" v-if="isModalOpen">
           <div class="modal-dialog">
             <div class="modal-content">
@@ -75,6 +75,16 @@
                   <div class="mb-3">
                     <label for="media" class="form-label">Media</label>
                     <input type="file" class="form-control" id="media" @change="handleFileUpload" />
+                    <!-- Preview for existing image when editing -->
+                    <div v-if="modalType === 'edit' && modalRecipe.media" class="mt-2">
+                      <p>Current image:</p>
+                      <img 
+                        :src="getSupabaseUrl(modalRecipe.media)" 
+                        alt="Current Recipe Image" 
+                        style="max-height: 150px; max-width: 100%;" 
+                        class="img-thumbnail"
+                      />
+                    </div>
                   </div>
                   <div class="mb-3">
                     <label for="category" class="form-label">Category</label>
@@ -90,6 +100,24 @@
                   </div>
                   <button type="submit" class="btn btn-success text-start">{{ modalType === 'add' ? 'Create Recipe' : 'Update Recipe' }}</button>
                 </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Image Preview Modal -->
+        <div class="modal fade show" tabindex="-1" style="display: block;" v-if="isImageModalOpen">
+          <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title text-start">Image Preview</h5>
+                <button type="button" class="btn-close" @click="closeImageModal"></button>
+              </div>
+              <div class="modal-body text-center">
+                <img :src="currentImageUrl" class="img-fluid" alt="Recipe Image" />
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" @click="closeImageModal">Close</button>
               </div>
             </div>
           </div>
@@ -120,8 +148,12 @@ export default {
       steps: '',
       media: '',
       category: 'breakfast',
-      cooking_time: '', // Updated key
+      cooking_time: '',
     });
+    
+    // Image preview modal
+    const isImageModalOpen = ref(false);
+    const currentImageUrl = ref('');
 
     const uploadedFile = ref(null);
 
@@ -180,7 +212,8 @@ export default {
     const updateRecipe = async () => {
       let mediaUrl = modalRecipe.value.media;
       if (uploadedFile.value) {
-        const { data, error } = await supabase.storage.from('uploads').upload(`recipes/${uploadedFile.value.name}`, uploadedFile.value);
+        const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
+        const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
         if (error) {
           console.error('File upload error:', error);
           return;
@@ -210,6 +243,18 @@ export default {
       return data.publicUrl;
     };
 
+    const openImageModal = (path) => {
+      if (!path) return;
+      const { data } = supabase.storage.from('uploads').getPublicUrl(path);
+      currentImageUrl.value = data.publicUrl;
+      isImageModalOpen.value = true;
+    };
+
+    const closeImageModal = () => {
+      isImageModalOpen.value = false;
+      currentImageUrl.value = '';
+    };
+
     onMounted(fetchRecipes);
 
     return {
@@ -224,6 +269,11 @@ export default {
       updateRecipe,
       deleteRecipe,
       getSupabaseUrl,
+      // Image modal
+      isImageModalOpen,
+      currentImageUrl,
+      openImageModal,
+      closeImageModal
     };
   },
 };
