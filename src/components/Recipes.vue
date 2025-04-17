@@ -11,7 +11,8 @@
         </div>
 
         <!-- Recipe List -->
-        <table class="table table-striped">
+        <LoadingSpinner v-if="loading" message="Loading recipes..." />
+        <table v-else class="table table-striped">
           <thead>
             <tr>
               <th scope="col">#</th>
@@ -55,7 +56,8 @@
                 <button type="button" class="btn-close" @click="closeModal"></button>
               </div>
               <div class="modal-body text-start">
-                <form @submit.prevent="modalType === 'add' ? createRecipe() : updateRecipe()">
+                <LoadingSpinner v-if="saveLoading" message="Saving recipe..." />
+                <form v-else @submit.prevent="modalType === 'add' ? createRecipe() : updateRecipe()">
                   <div class="mb-3">
                     <label for="title" class="form-label">Title</label>
                     <input v-model="modalRecipe.title" type="text" class="form-control" id="title" placeholder="Enter title" required />
@@ -78,11 +80,15 @@
                     <!-- Preview for existing image when editing -->
                     <div v-if="modalType === 'edit' && modalRecipe.media" class="mt-2">
                       <p>Current image:</p>
+                      <LoadingSpinner v-if="!previewImageLoaded" message="Loading preview..." class="my-2" />
                       <img 
                         :src="getSupabaseUrl(modalRecipe.media)" 
                         alt="Current Recipe Image" 
                         style="max-height: 150px; max-width: 100%;" 
                         class="img-thumbnail"
+                        @load="previewImageLoaded = true"
+                        @error="previewImageLoaded = true"
+                        :style="{ display: previewImageLoaded ? 'block' : 'none' }"
                       />
                     </div>
                   </div>
@@ -114,7 +120,15 @@
                 <button type="button" class="btn-close" @click="closeImageModal"></button>
               </div>
               <div class="modal-body text-center">
-                <img :src="currentImageUrl" class="img-fluid" alt="Recipe Image" />
+                <LoadingSpinner v-if="!modalImageLoaded" message="Loading image..." />
+                <img 
+                  :src="currentImageUrl" 
+                  class="img-fluid" 
+                  alt="Recipe Image" 
+                  @load="modalImageLoaded = true"
+                  @error="modalImageLoaded = true"
+                  :style="{ display: modalImageLoaded ? 'block' : 'none' }"
+                />
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" @click="closeImageModal">Close</button>
@@ -131,11 +145,13 @@
 import Menu from './Menu.vue';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../main';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 export default {
   name: 'Recipes',
   components: {
     Menu,
+    LoadingSpinner
   },
   setup() {
     const recipes = ref([]);
@@ -151,6 +167,12 @@ export default {
       cooking_time: '',
     });
     
+    // Loading states
+    const loading = ref(true);
+    const saveLoading = ref(false);
+    const previewImageLoaded = ref(false);
+    const modalImageLoaded = ref(false);
+    
     // Image preview modal
     const isImageModalOpen = ref(false);
     const currentImageUrl = ref('');
@@ -158,9 +180,16 @@ export default {
     const uploadedFile = ref(null);
 
     const fetchRecipes = async () => {
-      const { data, error } = await supabase.from('recipes').select('*');
-      if (error) console.error(error);
-      else recipes.value = data;
+      loading.value = true;
+      try {
+        const { data, error } = await supabase.from('recipes').select('*');
+        if (error) throw error;
+        recipes.value = data;
+      } catch (error) {
+        console.error('Error fetching recipes:', error);
+      } finally {
+        loading.value = false;
+      }
     };
 
     const openModal = (type, recipe = null) => {
@@ -175,6 +204,9 @@ export default {
         cooking_time: '',
       };
       isModalOpen.value = true;
+      
+      // Reset the preview image loading state
+      previewImageLoaded.value = false;
     };
 
     const closeModal = () => {
@@ -189,44 +221,50 @@ export default {
     };
 
     const createRecipe = async () => {
-      let mediaUrl = '';
-      if (uploadedFile.value) {
-        const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
-        const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
-        if (error) {
-          console.error('File upload error:', error);
-          return;
+      saveLoading.value = true;
+      try {
+        let mediaUrl = '';
+        if (uploadedFile.value) {
+          const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
+          const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
+          if (error) throw error;
+          mediaUrl = data.path;
         }
-        mediaUrl = data.path;
-      }
 
-      const recipeData = { ...modalRecipe.value, media: mediaUrl };
-      const { error } = await supabase.from('recipes').insert([recipeData]);
-      if (error) console.error(error);
-      else {
-        fetchRecipes();
+        const recipeData = { ...modalRecipe.value, media: mediaUrl };
+        const { error } = await supabase.from('recipes').insert([recipeData]);
+        if (error) throw error;
+        
+        await fetchRecipes();
         closeModal();
+      } catch (error) {
+        console.error('Error creating recipe:', error);
+      } finally {
+        saveLoading.value = false;
       }
     };
 
     const updateRecipe = async () => {
-      let mediaUrl = modalRecipe.value.media;
-      if (uploadedFile.value) {
-        const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
-        const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
-        if (error) {
-          console.error('File upload error:', error);
-          return;
+      saveLoading.value = true;
+      try {
+        let mediaUrl = modalRecipe.value.media;
+        if (uploadedFile.value) {
+          const uniqueFileName = `recipes/${Date.now()}_${uploadedFile.value.name}`;
+          const { data, error } = await supabase.storage.from('uploads').upload(uniqueFileName, uploadedFile.value);
+          if (error) throw error;
+          mediaUrl = data.path;
         }
-        mediaUrl = data.path;
-      }
 
-      const { id, ...updatedData } = { ...modalRecipe.value, media: mediaUrl };
-      const { error } = await supabase.from('recipes').update(updatedData).eq('id', id);
-      if (error) console.error(error);
-      else {
-        fetchRecipes();
+        const { id, ...updatedData } = { ...modalRecipe.value, media: mediaUrl };
+        const { error } = await supabase.from('recipes').update(updatedData).eq('id', id);
+        if (error) throw error;
+        
+        await fetchRecipes();
         closeModal();
+      } catch (error) {
+        console.error('Error updating recipe:', error);
+      } finally {
+        saveLoading.value = false;
       }
     };
 
@@ -245,6 +283,8 @@ export default {
 
     const openImageModal = (path) => {
       if (!path) return;
+      // Reset the modal image loading state
+      modalImageLoaded.value = false;
       const { data } = supabase.storage.from('uploads').getPublicUrl(path);
       currentImageUrl.value = data.publicUrl;
       isImageModalOpen.value = true;
@@ -269,6 +309,11 @@ export default {
       updateRecipe,
       deleteRecipe,
       getSupabaseUrl,
+      // Loading states
+      loading,
+      saveLoading,
+      previewImageLoaded,
+      modalImageLoaded,
       // Image modal
       isImageModalOpen,
       currentImageUrl,

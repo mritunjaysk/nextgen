@@ -5,17 +5,24 @@
       <div class="container mt-4">
         <h1 class="text-start mb-4">Our Recipes</h1>
         
-        <!-- Recipe Cards Grid -->
-        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        <!-- Recipe Cards Grid with Loading -->
+        <LoadingSpinner v-if="loading" message="Loading recipes..." />
+        
+        <div v-else class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
           <div v-for="recipe in recipes" :key="recipe.id" class="col">
             <div class="card h-100 shadow-sm recipe-card" @click="openRecipeDetails(recipe)">
               <div class="card-img-container">
-                <img 
-                  v-if="recipe.media" 
-                  :src="getSupabaseUrl(recipe.media)" 
-                  class="card-img-top recipe-image" 
-                  alt="Recipe Image"
-                >
+                <template v-if="recipe.media">
+                  <LoadingSpinner v-if="!imageLoadedMap[recipe.id]" class="py-2" />
+                  <img 
+                    :src="getSupabaseUrl(recipe.media)" 
+                    class="card-img-top recipe-image" 
+                    alt="Recipe Image"
+                    @load="setImageLoaded(recipe.id)"
+                    @error="setImageError(recipe.id)"
+                    :style="{ display: imageLoadedMap[recipe.id] ? 'block' : 'none' }"
+                  >
+                </template>
                 <div v-else class="no-image-placeholder">
                   <i class="bi bi-image text-secondary"></i>
                 </div>
@@ -42,11 +49,15 @@
             
             <div v-if="selectedRecipe" class="recipe-details">
               <div class="mb-4">
+                <LoadingSpinner v-if="!modalImageLoaded" message="Loading image..." />
                 <img 
                   v-if="selectedRecipe.media" 
                   :src="getSupabaseUrl(selectedRecipe.media)" 
                   class="img-fluid rounded recipe-detail-image" 
                   alt="Recipe Image"
+                  @load="modalImageLoaded = true"
+                  @error="modalImageLoaded = true"
+                  :style="{ display: modalImageLoaded ? 'block' : 'none' }"
                 >
               </div>
               
@@ -89,29 +100,62 @@
 
 <script>
 import Menu from './Menu.vue';
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, reactive } from 'vue';
 import { supabase } from '../main';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 export default {
   name: 'Home',
   components: {
     Menu,
+    LoadingSpinner
   },
   setup() {
     const recipes = ref([]);
     const isModalOpen = ref(false);
     const selectedRecipe = ref(null);
+    const loading = ref(true);
+    const modalImageLoading = ref(false);
+    const modalImageLoaded = ref(false);
+    const imageLoadedMap = reactive({});
 
     const fetchRecipes = async () => {
-      const { data, error } = await supabase.from('recipes').select('*');
-      if (error) console.error(error);
-      else recipes.value = data;
+      loading.value = true;
+      try {
+        const { data, error } = await supabase.from('recipes').select('*');
+        if (error) throw error;
+        recipes.value = data;
+        
+        // Initialize all images as not loaded
+        recipes.value.forEach(recipe => {
+          if (recipe.media) {
+            imageLoadedMap[recipe.id] = false;
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching recipes:', error);
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    const setImageLoaded = (recipeId) => {
+      console.log(`Image loaded for recipe ${recipeId}`);
+      imageLoadedMap[recipeId] = true;
+    };
+
+    const setImageError = (recipeId) => {
+      console.log(`Image error for recipe ${recipeId}`);
+      imageLoadedMap[recipeId] = true; // Set to true to hide loading spinner even on error
     };
 
     const openRecipeDetails = (recipe) => {
       selectedRecipe.value = recipe;
       isModalOpen.value = true;
       document.body.style.overflow = 'hidden'; // Prevent background scrolling
+      
+      // Reset image loading state for the modal
+      modalImageLoaded.value = false;
     };
 
     const closeRecipeDetails = () => {
@@ -159,7 +203,13 @@ export default {
       getSupabaseUrl,
       getCategoryClass,
       parseIngredients,
-      parseSteps
+      parseSteps,
+      loading,
+      modalImageLoading,
+      imageLoadedMap,
+      setImageLoaded,
+      setImageError,
+      modalImageLoaded
     };
   },
 };

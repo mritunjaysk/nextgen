@@ -7,7 +7,7 @@
       <i class="fas fa-utensils"></i> Recipes
     </router-link>
     <router-link v-if="isAdmin" to="/recipes-table" active-class="active" class="menu-link">
-      <i class="fas fa-table"></i> Recipes Table
+      <i class="fas fa-table"></i> Bulk Update
     </router-link>
     <router-link v-if="isAdmin" to="/admin" active-class="active" class="menu-link">
       <i class="fas fa-users-cog"></i> Users

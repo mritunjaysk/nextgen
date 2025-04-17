@@ -10,7 +10,9 @@
           <span v-if="saveStatus" class="ms-3" :class="saveStatus === 'Saved!' ? 'text-success' : 'text-danger'">{{ saveStatus }}</span>
         </div>
         
-        <div class="table-responsive">
+        <LoadingSpinner v-if="loading" message="Loading recipes..." />
+        
+        <div v-else class="table-responsive">
           <table class="table table-bordered table-hover">
             <thead class="table-light">
               <tr>
@@ -68,8 +70,16 @@
                     <textarea class="form-control" v-model="selectedRecipe.steps" rows="8"></textarea>
                   </div>
                 </div>
-                <div v-if="selectedRecipe.media" class=" mb-3">
-                  <img :src="getSupabaseUrl(selectedRecipe.media)" class="img-fluid rounded" style="max-height: 200px;" />
+                <div v-if="selectedRecipe.media" class="mb-3">
+                  <LoadingSpinner v-if="!recipeImageLoaded" message="Loading image..." class="my-2" />
+                  <img 
+                    :src="getSupabaseUrl(selectedRecipe.media)" 
+                    class="img-fluid rounded" 
+                    style="max-height: 200px;" 
+                    @load="recipeImageLoaded = true"
+                    @error="recipeImageLoaded = true"
+                    :style="{ display: recipeImageLoaded ? 'block' : 'none' }"
+                  />
                 </div>
               </div>
               <div class="modal-footer">
@@ -89,27 +99,35 @@ import Menu from './Menu.vue';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../main';
 import { HotTable } from '@handsontable/vue3';
+import LoadingSpinner from './LoadingSpinner.vue';
 import 'handsontable/dist/handsontable.full.min.css';
 
 export default {
   name: 'RecipesTable',
   components: {
     Menu,
-    HotTable
+    HotTable,
+    LoadingSpinner
   },
   setup() {
     const recipes = ref([]);
     const selectedRecipe = ref(null);
     const showModal = ref(false);
     const saveStatus = ref('');
+    const loading = ref(true);
+    const imageLoading = ref(true);
+    const recipeImageLoaded = ref(false);
     
     const fetchRecipes = async () => {
+      loading.value = true;
       try {
         const { data, error } = await supabase.from('recipes').select('*');
         if (error) throw error;
         recipes.value = data;
       } catch (error) {
         console.error('Error fetching recipes:', error);
+      } finally {
+        loading.value = false;
       }
     };
 
@@ -142,6 +160,8 @@ export default {
     const viewDetails = (recipe) => {
       selectedRecipe.value = { ...recipe };
       showModal.value = true;
+      imageLoading.value = !!recipe.media;
+      recipeImageLoaded.value = false;
     };
 
     const closeModal = () => {
@@ -187,6 +207,9 @@ export default {
       selectedRecipe,
       showModal,
       saveStatus,
+      loading,
+      imageLoading,
+      recipeImageLoaded,
       fetchRecipes,
       saveAllChanges,
       viewDetails,

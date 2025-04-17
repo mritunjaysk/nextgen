@@ -11,7 +11,8 @@
         </div>
 
         <!-- User List -->
-        <table class="table table-striped">
+        <LoadingSpinner v-if="loading" message="Loading users..." />
+        <table v-else class="table table-striped">
           <thead>
             <tr>
               <th scope="col">#</th>
@@ -73,22 +74,35 @@
 import Menu from './Menu.vue';
 import { ref, onMounted } from 'vue';
 import { supabase } from '../main';
+import LoadingSpinner from './LoadingSpinner.vue';
 
 export default {
   name: 'Admin',
   components: {
     Menu,
+    LoadingSpinner
   },
   setup() {
     const users = ref([]);
     const isModalOpen = ref(false);
     const modalType = ref('add');
     const modalUser = ref({ email: '', password: '', role: 'user' });
+    const loading = ref(true);
 
     const fetchUsers = async () => {
-      const { data, error } = await supabase.from('users').select('*');
-      if (error) console.error(error);
-      else users.value = data;
+      loading.value = true;
+      try {
+        const { data, error } = await supabase.from('users').select('*');
+        if (error) {
+          console.error('Error fetching users:', error);
+        } else {
+          users.value = data;
+        }
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
+        loading.value = false;
+      }
     };
 
     const openModal = (type, user = null) => {
@@ -138,6 +152,7 @@ export default {
       createUser,
       updateUser,
       deleteUser,
+      loading
     };
   },
 };
