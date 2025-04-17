@@ -3,6 +3,7 @@ import Home from './components/Home.vue';
 import Admin from './components/Admin.vue';
 import Login from './components/Login.vue';
 import Recipes from './components/Recipes.vue';
+import RecipesTable from './components/RecipesTable.vue';
 import { supabase } from './main';
 
 const routes = [
@@ -10,6 +11,7 @@ const routes = [
   { path: '/home', component: Home },
   { path: '/admin', component: Admin, meta: { requiresAdmin: true } },
   { path: '/recipes', component: Recipes },
+  { path: '/recipes-table', component: RecipesTable },
 ];
 
 const router = createRouter({
