@@ -4,6 +4,7 @@ import App from './App.vue'
 import { createClient } from '@supabase/supabase-js';
 import { ref } from 'vue';
 import router from './router';
+import Recipes from './components/Recipes.vue';
 
 const SUPABASE_URL = 'https://pdrvqqwxxkmwzoihacep.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBkcnZxcXd4eGttd3pvaWhhY2VwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ4MTAxOTUsImV4cCI6MjA2MDM4NjE5NX0.HyjSQ26bmoBLjG8UkzbqppASFEldad9vxWrEED9b0MQ';

@@ -1,0 +1,1 @@
+ALTER TABLE recipes RENAME COLUMN cooking_trime TO cooking_time;

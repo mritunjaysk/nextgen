@@ -50,6 +50,8 @@ max_client_conn = 100
 # Supports glob patterns relative to supabase directory: "./schemas/*.sql"
 schema_paths = []
 
+# Removed invalid [[migrations]] section as it is not supported.
+
 [db.seed]
 # If enabled, seeds the database after migrations during a db reset.
 enabled = true
